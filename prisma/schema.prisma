@@ -1,0 +1,171 @@
+// Prisma schema for Musicians Marketplace
+// Local: SQLite (file:./dev.db)
+// Production: Change provider to "postgresql" and update DATABASE_URL to Supabase
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         String   // PROVIDER | BOOKER
+  name         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  providerProfile ProviderProfile?
+  contactUnlocks  ContactUnlock[]
+  subscription    Subscription?
+  savedProviders  SavedProvider[]
+
+  @@map("users")
+}
+
+model ProviderProfile {
+  id                String  @id @default(cuid())
+  userId            String  @unique @map("user_id")
+  stageName         String  @default("") @map("stage_name")
+  providerType      String  @default("") @map("provider_type")
+  providerTypeOther String? @map("provider_type_other")
+  description       String  @default("")
+  baseLocation      String  @default("") @map("base_location")
+  imageUrl          String? @map("image_url")
+  minDuration       Int?    @map("min_duration")
+  maxDuration       Int?    @map("max_duration")
+  hourlyPrice       Float?  @map("hourly_price")
+  eventPrice        Float?  @map("event_price")
+  status            String  @default("DRAFT") // DRAFT | PUBLISHED
+  youtubeUrl        String? @map("youtube_url")
+  streamingUrl      String? @map("streaming_url")
+  demoAudioUrl      String? @map("demo_audio_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  genres         ProviderGenre[]
+  eventTypes     ProviderEventType[]
+  repertoireSongs RepertoireSong[]
+  contactPoints  ContactPoint[]
+  contactUnlocks ContactUnlock[]
+  savedByBookers SavedProvider[]
+
+  @@map("provider_profiles")
+}
+
+model Genre {
+  id   String @id @default(cuid())
+  slug String @unique
+  name String
+
+  providers ProviderGenre[]
+
+  @@map("genres")
+}
+
+model ProviderGenre {
+  providerProfileId String  @map("provider_profile_id")
+  genreId           String  @map("genre_id")
+  isPrimary         Boolean @default(false) @map("is_primary")
+
+  providerProfile ProviderProfile @relation(fields: [providerProfileId], references: [id], onDelete: Cascade)
+  genre           Genre           @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([providerProfileId, genreId])
+  @@map("provider_genres")
+}
+
+model EventType {
+  id   String @id @default(cuid())
+  slug String @unique
+  name String
+
+  providers ProviderEventType[]
+
+  @@map("event_types")
+}
+
+model ProviderEventType {
+  providerProfileId String @map("provider_profile_id")
+  eventTypeId       String @map("event_type_id")
+
+  providerProfile ProviderProfile @relation(fields: [providerProfileId], references: [id], onDelete: Cascade)
+  eventType       EventType       @relation(fields: [eventTypeId], references: [id], onDelete: Cascade)
+
+  @@id([providerProfileId, eventTypeId])
+  @@map("provider_event_types")
+}
+
+model RepertoireSong {
+  id                String   @id @default(cuid())
+  providerProfileId String   @map("provider_profile_id")
+  title             String
+  artist            String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  providerProfile ProviderProfile @relation(fields: [providerProfileId], references: [id], onDelete: Cascade)
+
+  @@map("repertoire_songs")
+}
+
+model ContactPoint {
+  id                String   @id @default(cuid())
+  providerProfileId String   @map("provider_profile_id")
+  type              String   // PHONE | EMAIL | OTHER
+  value             String
+  label             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  providerProfile ProviderProfile @relation(fields: [providerProfileId], references: [id], onDelete: Cascade)
+
+  @@map("contact_points")
+}
+
+model ContactUnlock {
+  id                String   @id @default(cuid())
+  bookerUserId      String   @map("booker_user_id")
+  providerProfileId String   @map("provider_profile_id")
+  paymentIntentId   String?  @map("payment_intent_id")
+  unlockedAt        DateTime @default(now()) @map("unlocked_at")
+
+  bookerUser      User            @relation(fields: [bookerUserId], references: [id], onDelete: Cascade)
+  providerProfile ProviderProfile @relation(fields: [providerProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([bookerUserId, providerProfileId])
+  @@map("contact_unlocks")
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique @map("user_id")
+  stripeSubscriptionId String?   @map("stripe_subscription_id")
+  status               String    // ACTIVE | CANCELLED | EXPIRED | PAST_DUE
+  currentPeriodStart   DateTime? @map("current_period_start")
+  currentPeriodEnd     DateTime? @map("current_period_end")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model SavedProvider {
+  id                String   @id @default(cuid())
+  bookerUserId      String   @map("booker_user_id")
+  providerProfileId String   @map("provider_profile_id")
+  savedAt           DateTime @default(now()) @map("saved_at")
+
+  bookerUser      User            @relation(fields: [bookerUserId], references: [id], onDelete: Cascade)
+  providerProfile ProviderProfile @relation(fields: [providerProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([bookerUserId, providerProfileId])
+  @@map("saved_providers")
+}
